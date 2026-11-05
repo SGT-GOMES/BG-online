@@ -393,30 +393,36 @@
         }
 
         async function carregarDadosFirebase() {
-            // Mostrar indicador visual no título se desejar
             const titulo = document.getElementById('totalEmprestado');
             if(titulo) titulo.innerText = "Sincronizando...";
             
             try {
-                // Adicionando um parâmetro de tempo para evitar cache no celular
                 const response = await fetch(FIREBASE_URL + "?t=" + new Date().getTime());
                 if (response.ok) {
                     const data = await response.json();
-                    if (data) {
-                        // Se o Firebase retornou um objeto com chaves (comum no Realtime DB), convertemos pra array
+                    
+                    // LÓGICA DE MIGRAÇÃO: Se o Firebase estiver vazio, mas o celular tiver dados antigos, envia para a nuvem
+                    const dadosAntigos = JSON.parse(localStorage.getItem('banco_gomes_dados'));
+                    
+                    if (!data && dadosAntigos && dadosAntigos.length > 0) {
+                        console.log("Migrando dados antigos do celular para a nuvem...");
+                        loans = dadosAntigos;
+                        await salvarDadosFirebase();
+                    } else if (data) {
                         loans = Array.isArray(data) ? data : Object.values(data);
                     } else {
                         loans = [];
                     }
+                    
                     console.log("Sincronizado com a nuvem.");
-                    localStorage.setItem('banco_gomes_dados_backup', JSON.stringify(loans)); // Backup local
+                    localStorage.setItem('banco_gomes_dados_backup', JSON.stringify(loans));
                 } else {
                     console.warn("Erro no servidor, carregando backup local.");
-                    loans = JSON.parse(localStorage.getItem('banco_gomes_dados_backup')) || [];
+                    loans = JSON.parse(localStorage.getItem('banco_gomes_dados_backup')) || JSON.parse(localStorage.getItem('banco_gomes_dados')) || [];
                 }
             } catch (err) {
                 console.warn("Sem internet, carregando backup local.", err);
-                loans = JSON.parse(localStorage.getItem('banco_gomes_dados_backup')) || [];
+                loans = JSON.parse(localStorage.getItem('banco_gomes_dados_backup')) || JSON.parse(localStorage.getItem('banco_gomes_dados')) || [];
             }
             carregandoNuvem = false;
             renderLoans();
