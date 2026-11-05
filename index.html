@@ -340,7 +340,11 @@
     </div>
 
     <script>
-        let loans = JSON.parse(localStorage.getItem('banco_gomes_dados')) || [];
+        // CONFIGURAÇÃO DO FIREBASE (Nuvem)
+        const FIREBASE_URL = "https://bg-emprestimos-default-rtdb.firebaseio.com/banco_gomes_dados.json";
+        
+        let loans = []; 
+        let carregandoNuvem = true;
         let tabAtual = 'todos';
         let orcamentoAtual = null;
         let configValorMinimoGlobal = parseFloat(localStorage.getItem('banco_gomes_valor_minimo')) || 150.00;
@@ -383,7 +387,59 @@
             document.getElementById('appContent').classList.add('visible');
             document.getElementById('senhaInput').value = ''; 
             document.getElementById('erroSenha').classList.add('hidden');
+            
+            // Inicia o carregamento da nuvem
+            carregarDadosFirebase();
+        }
+
+        async function carregarDadosFirebase() {
+            // Mostrar indicador visual no título se desejar
+            const titulo = document.getElementById('totalEmprestado');
+            if(titulo) titulo.innerText = "Sincronizando...";
+            
+            try {
+                // Adicionando um parâmetro de tempo para evitar cache no celular
+                const response = await fetch(FIREBASE_URL + "?t=" + new Date().getTime());
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data) {
+                        // Se o Firebase retornou um objeto com chaves (comum no Realtime DB), convertemos pra array
+                        loans = Array.isArray(data) ? data : Object.values(data);
+                    } else {
+                        loans = [];
+                    }
+                    console.log("Sincronizado com a nuvem.");
+                    localStorage.setItem('banco_gomes_dados_backup', JSON.stringify(loans)); // Backup local
+                } else {
+                    console.warn("Erro no servidor, carregando backup local.");
+                    loans = JSON.parse(localStorage.getItem('banco_gomes_dados_backup')) || [];
+                }
+            } catch (err) {
+                console.warn("Sem internet, carregando backup local.", err);
+                loans = JSON.parse(localStorage.getItem('banco_gomes_dados_backup')) || [];
+            }
+            carregandoNuvem = false;
             renderLoans();
+        }
+
+        async function salvarDadosFirebase() {
+            // Salva backup local imediatamente
+            localStorage.setItem('banco_gomes_dados_backup', JSON.stringify(loans));
+            
+            try {
+                // PUT substitui completamente o nó
+                const response = await fetch(FIREBASE_URL, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(loans)
+                });
+                if (!response.ok) throw new Error("Erro Firebase");
+                console.log("Nuvem atualizada.");
+            } catch (err) {
+                console.error("Erro ao salvar na nuvem.", err);
+                // Não alertamos para não irritar o usuário toda hora se a internet oscilar, 
+                // ele já tem o backup local salvo.
+            }
         }
 
         function definirSenha() {
@@ -680,7 +736,7 @@
                     if (Array.isArray(importedData)) {
                         if (confirm('Atenção: A restauração substituirá os dados atuais. Deseja continuar?')) {
                             loans = importedData;
-                            localStorage.setItem('banco_gomes_dados', JSON.stringify(loans));
+                            salvarDadosFirebase();
                             renderLoans();
                             alert('Dados restaurados com sucesso!');
                             toggleModal('modalConfig');
@@ -794,8 +850,8 @@
             if (editIndex >= 0) loans[editIndex] = loanData;
             else loans.push(loanData);
 
-            localStorage.setItem('banco_gomes_dados', JSON.stringify(loans));
-            toggleForm(); 
+            toggleForm();
+            salvarDadosFirebase();
             renderLoans();
         }
 
@@ -831,7 +887,7 @@
         function deletarEmprestimo(index) {
             if (confirm('Atenção: Excluir este registo do sistema?')) {
                 loans.splice(index, 1);
-                localStorage.setItem('banco_gomes_dados', JSON.stringify(loans));
+                salvarDadosFirebase();
                 renderLoans();
             }
         }
@@ -883,7 +939,7 @@
             }
 
             // Guardar o novo estado no localStorage imediatamente e atualizar a tela
-            localStorage.setItem('banco_gomes_dados', JSON.stringify(loans));
+            salvarDadosFirebase();
             renderLoans();
 
             // 2. Gerar Comprovante PDF usando o snapshot anterior e os dados de vencimento futuro
