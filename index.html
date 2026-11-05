@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BG Empréstimos</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Ícones Phosphor -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- jsPDF para geração de Relatórios e Comprovantes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body { background-color: #F4F4F9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; justify-content: center; align-items: flex-end; }
+        .modal.active { display: flex; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Estilos do Ecrã de Login */
+        #loginScreen {
+            position: fixed;
+            inset: 0;
+            background-color: #F4F4F9;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        #loginScreen.hidden {
+            display: none;
+        }
+        #appContent {
+            display: none;
+        }
+        #appContent.visible {
+            display: block;
+        }
+
+        /* Animação do Logo */
+        .logo-gradient {
+            background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .logo-icon-bg {
+            background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+    </style>
+</head>
+<body class="p-0"> <!-- Removido padding global para o login ocupar tudo -->
+    
+    <!-- ECRÃ DE LOGIN -->
+    <div id="loginScreen">
+        <div class="w-full max-w-sm bg-white p-8 rounded-3xl shadow-lg border border-gray-100 flex flex-col items-center">
+            <!-- Novo Logo Sofisticado -->
+            <div class="w-20 h-20 logo-icon-bg rounded-2xl flex items-center justify-center text-white mb-5 relative overflow-hidden">
+                <div class="absolute inset-0 bg-white opacity-10 rotate-45 transform scale-150 translate-x-4"></div>
+                <span class="text-3xl font-black tracking-tighter" style="font-family: Georgia, serif;">BG</span>
+            </div>
+            
+            <h1 class="text-2xl font-bold text-gray-800 mb-1">BG Empréstimos</h1>
+            <p class="text-xs text-gray-400 font-medium mb-8 uppercase tracking-widest">Acesso Restrito</p>
+            
+            <div class="w-full mb-6 relative">
+                <i class="ph ph-lock-key absolute left-4 top-3.5 text-gray-400 text-lg"></i>
+                <input type="password" id="senhaInput" placeholder="Introduza a senha" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 pl-12 pr-4 text-sm outline-none focus:border-blue-500 text-center tracking-widest" onkeypress="verificarEnter(event)">
+            </div>
+            
+            <button onclick="verificarSenha()" class="w-full bg-blue-600 text-white font-bold rounded-xl py-3.5 shadow-sm active:scale-95 transition-transform flex justify-center items-center gap-2 hover:bg-blue-700">
+                Entrar no Sistema <i class="ph ph-arrow-right font-bold"></i>
+            </button>
+            <p id="erroSenha" class="text-red-500 text-xs font-semibold mt-3 hidden">Senha incorreta. Tente novamente.</p>
+        </div>
+        
+        <div class="mt-8 text-center text-[10px] text-gray-400">
+            &copy; 2026 BG Empréstimos. Todos os direitos reservados.
+        </div>
+    </div>
+
+    <!-- CONTEÚDO PRINCIPAL DO APP (Oculto até ao login) -->
+    <div id="appContent" class="p-4 pb-20 max-w-md mx-auto">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center gap-3">
+                <!-- Ícone Logo Menor -->
+                <div class="w-10 h-10 logo-icon-bg rounded-xl flex items-center justify-center text-white shadow-sm">
+                    <span class="text-lg font-black tracking-tighter" style="font-family: Georgia, serif;">BG</span>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-800 tracking-tight">BG Empréstimos</h1>
+                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Gestão Financeira</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-1.5 mb-6">
+            <!-- Botão de Configurações (Backup & Senha) -->
+            <button onclick="toggleModal('modalConfig')" class="w-10 h-10 bg-white border border-gray-100 rounded-xl shadow-sm flex items-center justify-center text-gray-600 active:scale-95 transition-transform hover:bg-gray-50">
+                <i class="ph ph-gear text-lg"></i>
+            </button>
+            <!-- Botão de Orçamento / Simulação -->
+            <button onclick="toggleModal('modalOrcamento')" class="w-10 h-10 bg-white border border-gray-100 rounded-xl shadow-sm flex items-center justify-center text-purple-600 active:scale-95 transition-transform hover:bg-purple-50">
+                <i class="ph ph-calculator text-lg"></i>
+            </button>
+            <!-- Botão de Relatórios -->
+            <button onclick="toggleModal('modalRelatorios')" class="w-10 h-10 bg-white border border-gray-100 rounded-xl shadow-sm flex items-center justify-center text-blue-600 active:scale-95 transition-transform hover:bg-blue-50">
+                <i class="ph ph-file-pdf text-lg"></i>
+            </button>
+            <!-- Botão Novo Empréstimo -->
+            <button onclick="toggleForm()" class="px-4 h-10 bg-blue-600 rounded-xl shadow-sm flex items-center justify-center text-white font-bold text-sm active:scale-95 transition-transform hover:bg-blue-700 gap-1.5">
+                <i class="ph ph-plus font-bold"></i> Novo
+            </button>
+        </div>
+
+        <!-- Dashboard -->
+        <div class="grid grid-cols-3 gap-2 mb-4">
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-3 rounded-xl shadow-sm border border-blue-400">
+                <p class="text-[9px] font-bold uppercase opacity-90 tracking-wide">Total Capital</p>
+                <p class="text-[13px] font-bold mt-1" id="totalEmprestado">R$ 0,00</p>
+            </div>
+            <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white p-3 rounded-xl shadow-sm border border-indigo-400">
+                <p class="text-[9px] font-bold uppercase opacity-90 tracking-wide">Receb. Mensal</p>
+                <p class="text-[13px] font-bold mt-1" id="totalRecebimento">R$ 0,00</p>
+            </div>
+            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white p-3 rounded-xl shadow-sm border border-emerald-400">
+                <p class="text-[9px] font-bold uppercase opacity-90 tracking-wide">Juros Mensal</p>
+                <p class="text-[13px] font-bold mt-1" id="totalJurosMensal">R$ 0,00</p>
+            </div>
+        </div>
+
+        <!-- Abas de Filtro -->
+        <div class="flex gap-2 mb-4 overflow-x-auto pb-1 hide-scrollbar">
+            <button onclick="setTab('todos')" id="tab-todos" class="px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap bg-blue-600 text-white shadow-sm transition-colors">Todos</button>
+            <button onclick="setTab('em_dia')" id="tab-em_dia" class="px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap bg-white text-gray-500 border border-gray-200 transition-colors hover:bg-gray-50">Em Dia</button>
+            <button onclick="setTab('em_atraso')" id="tab-em_atraso" class="px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap bg-white text-gray-500 border border-gray-200 transition-colors hover:bg-gray-50">Em Atraso</button>
+        </div>
+
+        <!-- Campo de Busca -->
+        <div class="relative mb-6">
+            <i class="ph ph-magnifying-glass absolute left-4 top-3.5 text-gray-400 text-lg"></i>
+            <input type="text" id="searchBox" oninput="renderLoans()" placeholder="Buscar cliente..." class="w-full bg-white border border-gray-200 rounded-xl py-3 pl-12 pr-4 text-sm shadow-sm outline-none text-gray-600 focus:border-blue-400 transition-colors">
+        </div>
+
+        <!-- Lista de Empréstimos -->
+        <div id="loanList" class="flex flex-col gap-4"></div>
+    </div> <!-- Fim appContent -->
+
+    <!-- Modal Orçamento (Simulador Tabela Price) -->
+    <div id="modalOrcamento" class="modal">
+        <div class="bg-white w-full rounded-t-3xl p-6 shadow-xl transform transition-transform h-[85vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+                <h3 class="text-lg font-bold text-purple-700 flex items-center gap-2"><i class="ph ph-calculator"></i> Simulador de Orçamento</h3>
+                <button onclick="toggleModal('modalOrcamento')" class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200"><i class="ph ph-x"></i></button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Nome do Possível Cliente</label>
+                    <input type="text" id="orcNome" placeholder="Ex: João Silva" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-purple-500 transition-colors">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Valor do Empréstimo (R$)</label>
+                    <input type="number" id="orcValor" step="0.01" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-purple-500 transition-colors">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Taxa (%) a.m.</label>
+                        <input type="number" id="orcTaxa" step="0.01" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-purple-500 transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Qtd. Parcelas</label>
+                        <input type="number" id="orcParcelas" min="1" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-purple-500 transition-colors">
+                    </div>
+                </div>
+                
+                <button onclick="calcularOrcamento()" class="w-full bg-purple-600 text-white font-bold rounded-xl py-3.5 mt-2 active:scale-95 transition-transform shadow-md hover:bg-purple-700">
+                    Calcular Tabela Price
+                </button>
+
+                <!-- Div de Resultado -->
+                <div id="orcResult" class="hidden mt-6 bg-gradient-to-br from-purple-50 to-white p-5 rounded-2xl border border-purple-100 shadow-sm">
+                    <p class="text-xs text-purple-600 font-bold uppercase tracking-wider text-center mb-2">Valor da Parcela Fixa</p>
+                    <p class="text-4xl font-black text-purple-800 text-center mb-5 tracking-tight" id="orcValParcela">R$ 0,00</p>
+                    
+                    <button onclick="gerarPDFOrcamento()" class="w-full bg-gray-900 text-white font-bold rounded-xl py-3.5 flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-md hover:bg-black">
+                        <i class="ph ph-share-network text-lg"></i> Gerar PDF Profissional
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Configurações / Backup / Senha -->
+    <div id="modalConfig" class="modal">
+        <div class="bg-white w-full rounded-t-3xl p-6 shadow-xl transform transition-transform h-[85vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><i class="ph ph-gear text-blue-600"></i> Configurações</h3>
+                <button onclick="toggleModal('modalConfig')" class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200"><i class="ph ph-x"></i></button>
+            </div>
+            
+            <!-- Secção de Senha -->
+            <div class="mb-6 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                <p class="text-xs text-gray-600 font-bold uppercase tracking-wide mb-3 flex items-center gap-1.5"><i class="ph ph-lock-key text-gray-400"></i> Segurança de Acesso</p>
+                <div class="flex gap-2">
+                    <input type="password" id="novaSenhaInput" placeholder="Definir Nova Senha" class="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-500">
+                    <button onclick="definirSenha()" class="bg-gray-800 text-white font-bold rounded-xl px-5 py-2.5 text-sm shadow-sm active:scale-95 transition-transform hover:bg-black">Salvar</button>
+                </div>
+                <button onclick="removerSenha()" class="w-full text-red-500 text-xs font-bold mt-3 py-2.5 bg-red-50 hover:bg-red-100 rounded-xl transition-colors border border-red-100">Remover Senha Atual</button>
+            </div>
+
+            <!-- Parâmetros do Sistema -->
+            <div class="mb-6 bg-purple-50 p-4 rounded-2xl border border-purple-100">
+                <p class="text-xs text-purple-800 font-bold uppercase tracking-wide mb-3 flex items-center gap-1.5"><i class="ph ph-sliders text-purple-400"></i> Parâmetros do Sistema</p>
+                <label class="block text-xs font-semibold text-purple-800 mb-1">Valor Mínimo de Juros (R$)</label>
+                <div class="flex gap-2">
+                    <input type="number" id="configValorMinimo" step="0.01" class="flex-1 bg-white border border-purple-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-purple-500 font-bold">
+                    <button onclick="salvarConfigMinimo()" class="bg-purple-600 text-white font-bold rounded-xl px-5 py-2.5 text-sm shadow-sm active:scale-95 transition-transform hover:bg-purple-700">Salvar</button>
+                </div>
+                <p class="text-[10px] text-purple-600/70 mt-2 leading-tight">Mensalidade fixa aplicada quando a opção "Mín. Juros" for ativada no contrato.</p>
+            </div>
+
+            <!-- Secção de Backup -->
+            <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                <p class="text-xs text-blue-800 font-bold uppercase tracking-wide mb-3 flex items-center gap-1.5"><i class="ph ph-database text-blue-400"></i> Backup e Restauração</p>
+                <div class="flex flex-col gap-3">
+                    <button onclick="exportarBackup()" class="w-full bg-blue-600 text-white font-bold rounded-xl py-3 flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-transform text-sm hover:bg-blue-700">
+                        <i class="ph ph-download-simple text-lg"></i> Exportar Dados (Salvar .json)
+                    </button>
+                    
+                    <label class="w-full bg-white text-blue-600 font-bold rounded-xl py-3 flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-transform cursor-pointer border border-blue-200 text-sm hover:bg-blue-50">
+                        <i class="ph ph-upload-simple text-lg"></i> Importar Dados (Restaurar)
+                        <input type="file" onchange="importarBackup(event)" accept=".json" class="hidden">
+                    </label>
+                </div>
+                <p class="text-[10px] text-blue-600/70 mt-3 text-center leading-tight">Faça backup regularmente para garantir que não perde os dados do BG Empréstimos.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Relatórios -->
+    <div id="modalRelatorios" class="modal">
+        <div class="bg-white w-full rounded-t-3xl p-6 shadow-xl transform transition-transform">
+            <div class="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><i class="ph ph-file-pdf text-blue-600"></i> Relatórios Financeiros</h3>
+                <button onclick="toggleModal('modalRelatorios')" class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200"><i class="ph ph-x"></i></button>
+            </div>
+            
+            <div class="flex flex-col gap-3">
+                <button onclick="gerarRelatorioCompleto()" class="w-full bg-gray-800 text-white font-bold rounded-xl py-4 flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform hover:bg-black">
+                    <i class="ph ph-users text-xl"></i> 
+                    <div class="text-left">
+                        <div class="text-sm">Carteira de Clientes</div>
+                        <div class="text-[10px] text-gray-300 font-normal">Relatório completo de todos os empréstimos</div>
+                    </div>
+                </button>
+                
+                <button onclick="gerarRelatorioMes()" class="w-full bg-blue-600 text-white font-bold rounded-xl py-4 flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform hover:bg-blue-700">
+                    <i class="ph ph-coins text-xl"></i> 
+                    <div class="text-left">
+                        <div class="text-sm">Recebimentos do Mês</div>
+                        <div class="text-[10px] text-blue-200 font-normal">Lucro real e juros recebidos neste mês</div>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulário Modal -->
+    <div id="formModal" class="modal">
+        <div class="bg-white w-full rounded-t-3xl p-6 shadow-xl transform transition-transform h-[85vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+                <h3 id="formTitle" class="text-lg font-bold text-gray-800 flex items-center gap-2"><i class="ph ph-plus-circle text-blue-600"></i> Novo Empréstimo</h3>
+                <button onclick="toggleForm()" class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200"><i class="ph ph-x"></i></button>
+            </div>
+            
+            <input type="hidden" id="editIndex" value="-1">
+            
+            <div class="space-y-4">
+                <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-4">
+                    <p class="text-xs text-gray-500 font-bold uppercase tracking-wide mb-1 border-b border-gray-200 pb-2">Dados do Cliente</p>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Nome Completo</label>
+                        <input type="text" id="nome" class="w-full bg-white border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="col-span-2">
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Telefone / WhatsApp</label>
+                            <input type="text" id="telefone" placeholder="(00) 00000-0000" class="w-full bg-white border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Endereço</label>
+                            <input type="text" id="endereco" class="w-full bg-white border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100 space-y-4">
+                    <p class="text-xs text-blue-800 font-bold uppercase tracking-wide mb-1 border-b border-blue-200 pb-2">Condições do Empréstimo</p>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Capital (R$)</label>
+                            <input type="number" id="valor" step="0.01" class="w-full bg-white border border-blue-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="block text-xs font-semibold text-gray-700">Taxa (%)</label>
+                                <button type="button" id="btnMinimoJuros" onclick="toggleValorMinimo()" class="text-[9px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded font-bold uppercase tracking-wider transition-colors cursor-pointer hidden">
+                                    MÍN. JUROS
+                                </button>
+                            </div>
+                            <input type="number" id="taxa" step="0.01" class="w-full bg-white border border-blue-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500 transition-colors">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Data de Início</label>
+                        <input type="date" id="dataEmprestimo" class="w-full bg-white border border-blue-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Modalidade de Pagamento</label>
+                        <select id="tipoPagamento" onchange="mudarTipoPagamento()" class="w-full bg-white border border-blue-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500 font-medium">
+                            <option value="juros">Apenas Juros Mensais</option>
+                            <option value="price">Tabela Price (Parcelas Fixas)</option>
+                        </select>
+                    </div>
+                    <div id="grupoParcelas" style="display: none;">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Quantidade de Parcelas</label>
+                        <input type="number" id="parcelas" value="1" min="1" class="w-full bg-white border border-blue-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500">
+                    </div>
+                </div>
+                
+                <button onclick="salvarEmprestimo()" class="w-full bg-blue-600 text-white font-bold rounded-xl py-4 mt-2 active:scale-95 transition-transform shadow-md hover:bg-blue-700">
+                    Salvar Contrato
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let loans = JSON.parse(localStorage.getItem('banco_gomes_dados')) || [];
+        let tabAtual = 'todos';
+        let orcamentoAtual = null;
+        let configValorMinimoGlobal = parseFloat(localStorage.getItem('banco_gomes_valor_minimo')) || 150.00;
+        let isValorMinimoAtivo = false;
+        let valorMinimoTemporario = 0;
+
+        // SISTEMA DE SEGURANÇA (LOGIN)
+        function inicializarSeguranca() {
+            const senhaSalva = localStorage.getItem('banco_gomes_senha');
+            if (senhaSalva && senhaSalva !== '') {
+                document.getElementById('loginScreen').classList.remove('hidden');
+                document.getElementById('appContent').classList.remove('visible');
+                setTimeout(() => document.getElementById('senhaInput').focus(), 100);
+            } else {
+                liberarAcesso();
+            }
+        }
+
+        function verificarEnter(event) {
+            if (event.key === 'Enter') {
+                verificarSenha();
+            }
+        }
+
+        function verificarSenha() {
+            const senhaDigitada = document.getElementById('senhaInput').value;
+            const senhaSalva = localStorage.getItem('banco_gomes_senha');
+            
+            if (senhaDigitada === senhaSalva) {
+                liberarAcesso();
+            } else {
+                document.getElementById('erroSenha').classList.remove('hidden');
+                document.getElementById('senhaInput').classList.add('border-red-500', 'bg-red-50');
+                setTimeout(() => {
+                    document.getElementById('senhaInput').classList.remove('border-red-500', 'bg-red-50');
+                }, 1000);
+            }
+        }
+
+        function liberarAcesso() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('appContent').classList.add('visible');
+            document.getElementById('senhaInput').value = ''; 
+            document.getElementById('erroSenha').classList.add('hidden');
+            renderLoans();
+        }
+
+        function definirSenha() {
+            const novaSenha = document.getElementById('novaSenhaInput').value;
+            if(novaSenha.trim() === '') {
+                alert('Por favor, digite uma senha válida.');
+                return;
+            }
+            localStorage.setItem('banco_gomes_senha', novaSenha);
+            alert('Senha salva! Será exigida na próxima vez que abrir o aplicativo.');
+            document.getElementById('novaSenhaInput').value = '';
+            toggleModal('modalConfig');
+        }
+
+        function removerSenha() {
+            if(confirm('Tem certeza que deseja remover a senha de acesso?')) {
+                localStorage.removeItem('banco_gomes_senha');
+                alert('Senha removida. Acesso livre.');
+                toggleModal('modalConfig');
+            }
+        }
+
+        function salvarConfigMinimo() {
+            const val = parseFloat(document.getElementById('configValorMinimo').value);
+            if (isNaN(val) || val < 0) {
+                alert('Introduza um valor válido.');
+                return;
+            }
+            configValorMinimoGlobal = val;
+            localStorage.setItem('banco_gomes_valor_minimo', configValorMinimoGlobal);
+            alert('Valor mínimo de juros atualizado para ' + formatarDinheiro(val));
+            toggleModal('modalConfig');
+            atualizarUIValorMinimo();
+        }
+
+
+        function toggleValorMinimo() {
+            if (document.getElementById('tipoPagamento').value !== 'juros') return;
+            isValorMinimoAtivo = !isValorMinimoAtivo;
+            atualizarUIValorMinimo();
+        }
+
+        function atualizarUIValorMinimo() {
+            const btn = document.getElementById('btnMinimoJuros');
+            const inputTaxa = document.getElementById('taxa');
+            if (!btn || !inputTaxa) return;
+            
+            let valAplicado = isValorMinimoAtivo ? (valorMinimoTemporario > 0 ? valorMinimoTemporario : configValorMinimoGlobal) : configValorMinimoGlobal;
+            
+            btn.innerText = isValorMinimoAtivo ? `MÍN. R$ ${valAplicado.toFixed(2)}` : `MÍN. JUROS`;
+            
+            if (isValorMinimoAtivo) {
+                btn.classList.remove('bg-gray-200', 'text-gray-600');
+                btn.classList.add('bg-blue-600', 'text-white');
+                inputTaxa.value = '';
+                inputTaxa.disabled = true;
+                inputTaxa.classList.add('bg-gray-100', 'cursor-not-allowed', 'opacity-50');
+            } else {
+                btn.classList.add('bg-gray-200', 'text-gray-600');
+                btn.classList.remove('bg-blue-600', 'text-white');
+                inputTaxa.disabled = false;
+                inputTaxa.classList.remove('bg-gray-100', 'cursor-not-allowed', 'opacity-50');
+            }
+        }
+        // UTILIDADES
+        function formatarDinheiro(valor) { return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
+        
+        function getHojeISO() {
+            const d = new Date();
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+
+        function formatarDataBR(dataISO) {
+            if (!dataISO || typeof dataISO !== 'string') return '--/--/----';
+            let p = dataISO.split('T')[0].split('-');
+            if (p.length !== 3) return dataISO;
+            return p[2] + '/' + p[1] + '/' + p[0];
+        }
+
+        function adicionarMesesISO(dataISO, meses) {
+            if (!dataISO) dataISO = getHojeISO();
+            let p = dataISO.split('T')[0].split('-');
+            if (p.length !== 3 || isNaN(p[0])) return getHojeISO();
+            let dt = new Date(parseInt(p[0]), parseInt(p[1]) - 1 + meses, parseInt(p[2]));
+            if (dt.getDate() !== parseInt(p[2])) dt.setDate(0); 
+            return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+        }
+
+        function getLoanFin(loan) {
+            let jurosMes = 0, parcelaValor = 0, amortizacaoMes = 0, saldoDevedor = loan.valor;
+            const i = loan.taxa / 100;
+            const pTotal = loan.parcelasTotais || 1;
+            const pAtual = loan.parcelaAtual || 1;
+
+            if (loan.tipoPagamento === 'juros') {
+                if (loan.usaValorMinimo) {
+                    jurosMes = loan.valorMinimoAplicado || parseFloat(localStorage.getItem('banco_gomes_valor_minimo')) || 150;
+                } else {
+                    jurosMes = loan.valor * i;
+                }
+                parcelaValor = jurosMes;
+            } else {
+                if (i === 0) {
+                    parcelaValor = loan.valor / pTotal;
+                    jurosMes = 0;
+                    amortizacaoMes = parcelaValor;
+                } else {
+                    parcelaValor = loan.valor * (i * Math.pow(1 + i, pTotal)) / (Math.pow(1 + i, pTotal) - 1);
+                    for (let p = 1; p < pAtual; p++) {
+                        let jurosParc = saldoDevedor * i;
+                        saldoDevedor -= (parcelaValor - jurosParc);
+                    }
+                    jurosMes = saldoDevedor * i;
+                    amortizacaoMes = parcelaValor - jurosMes;
+                }
+            }
+            return { jurosMes, parcelaValor, amortizacaoMes, saldoDevedor };
+        }
+
+        // DESENHAR LOGO NO PDF
+        function desenharLogoPDF(doc, x, y) {
+            // Fundo quadrado arredondado (aproximado)
+            doc.setFillColor(30, 58, 138); // bg-blue-900
+            doc.roundedRect(x, y, 14, 14, 3, 3, 'F');
+            
+            // Texto BG
+            doc.setTextColor(255, 255, 255);
+            doc.setFont("georgia", "bold");
+            doc.setFontSize(14);
+            doc.text("BG", x + 2.5, y + 9.5);
+            
+            // Reset font
+            doc.setFont("helvetica", "normal");
+        }
+
+        // SISTEMA DE ORÇAMENTO (SIMULAÇÃO)
+        function calcularOrcamento() {
+            const nome = document.getElementById('orcNome').value || 'Prezado(a) Cliente';
+            const valor = parseFloat(document.getElementById('orcValor').value);
+            const taxa = parseFloat(document.getElementById('orcTaxa').value);
+            const parcelas = parseInt(document.getElementById('orcParcelas').value);
+
+            if (isNaN(valor) || isNaN(taxa) || isNaN(parcelas) || parcelas < 1) {
+                alert('Preencha os campos corretamente.');
+                return;
+            }
+
+            const i = taxa / 100;
+            let parcela = 0;
+            
+            if (i === 0) {
+                parcela = valor / parcelas;
+            } else {
+                parcela = valor * (i * Math.pow(1 + i, parcelas)) / (Math.pow(1 + i, parcelas) - 1);
+            }
+
+            orcamentoAtual = { nome, valor, taxa, parcelas, parcela };
+
+            document.getElementById('orcValParcela').innerText = formatarDinheiro(parcela);
+            document.getElementById('orcResult').classList.remove('hidden');
+        }
+
+        async function gerarPDFOrcamento() {
+            if (!orcamentoAtual || !window.jspdf) return;
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ format: 'a4' }); 
+            const sim = orcamentoAtual;
+
+            const corAzulEscuro = [30, 58, 138]; 
+            const corAzulMedio = [37, 99, 235];  
+            const corCinza = [75, 85, 99];       
+            
+            // HEADER
+            doc.setFillColor(...corAzulEscuro);
+            doc.rect(0, 0, 210, 45, 'F');
+            
+            // Desenhar Logo Sofisticado
+            desenharLogoPDF(doc, 20, 15);
+            
+            // Nome
+            doc.setTextColor(255, 255, 255);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(22);
+            doc.text("BG Empréstimos", 38, 25);
+            
+            // Título
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "normal");
+            doc.text("SIMULAÇÃO DE CRÉDITO - TABELA PRICE", 38, 32);
+
+            // CORPO
+            doc.setTextColor(20, 20, 20);
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            doc.text(`Olá, ${sim.nome}`, 20, 65);
+            
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(...corCinza);
+            let textoIntro = "Apresentamos abaixo as condições simuladas para a sua solicitação de empréstimo. Este modelo garante parcelas mensais fixas do início ao fim do contrato, facilitando o seu planejamento financeiro.";
+            let textoDividido = doc.splitTextToSize(textoIntro, 170);
+            doc.text(textoDividido, 20, 75);
+
+            // QUADRO RESUMO
+            doc.setDrawColor(...corAzulMedio);
+            doc.setLineWidth(0.5);
+            doc.setFillColor(249, 250, 251);
+            doc.roundedRect(20, 95, 170, 55, 3, 3, 'FD');
+
+            doc.setTextColor(20, 20, 20);
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("Detalhes do Empréstimo Solicitado", 25, 105);
+            
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "normal");
+            
+            doc.text("Valor Solicitado:", 25, 120);
+            doc.setFont("helvetica", "bold");
+            doc.text(`R$ ${sim.valor.toFixed(2)}`, 80, 120);
+            doc.setFont("helvetica", "normal");
+            
+            doc.text("Taxa de Juros:", 25, 130);
+            doc.setFont("helvetica", "bold");
+            doc.text(`${sim.taxa.toFixed(2)}% a.m.`, 80, 130);
+            doc.setFont("helvetica", "normal");
+            
+            doc.text("Prazo de Pagamento:", 25, 140);
+            doc.setFont("helvetica", "bold");
+            doc.text(`${sim.parcelas} meses`, 80, 140);
+            
+            // QUADRO PARCELA
+            doc.setDrawColor(...corAzulMedio);
+            doc.setLineWidth(1);
+            doc.setFillColor(239, 246, 255);
+            doc.roundedRect(20, 165, 170, 45, 5, 5, 'FD');
+
+            doc.setTextColor(...corAzulEscuro);
+            doc.setFontSize(13);
+            doc.setFont("helvetica", "bold");
+            doc.text("VALOR DA PARCELA MENSAL FIXA", 105, 180, { align: "center" });
+            
+            doc.setFontSize(32);
+            doc.text(`R$ ${sim.parcela.toFixed(2)}`, 105, 198, { align: "center" });
+
+            // RODAPÉ
+            doc.setTextColor(150, 150, 150);
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "normal");
+            doc.text("ATENÇÃO: Este documento é exclusivamente uma simulação e não configura uma", 105, 275, { align: "center" });
+            doc.text("proposta vinculativa nem a aprovação automática de crédito. Sujeito à análise.", 105, 280, { align: "center" });
+            
+            doc.setFontSize(8);
+            doc.text(`BG Empréstimos - Gerado em ${formatarDataBR(getHojeISO())}`, 105, 288, { align: "center" });
+
+            const pdfBlob = doc.output('blob');
+            const file = new File([pdfBlob], `Simulacao_BG_${sim.nome.replace(/\s+/g, '_')}.pdf`, { type: 'application/pdf' });
+            
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try { await navigator.share({ files: [file], title: 'Simulação BG Empréstimos', text: 'Segue a simulação financeira.' }); } 
+                catch (e) { doc.save(file.name); }
+            } else { doc.save(file.name); }
+        }
+
+        // BACKUP
+        function exportarBackup() {
+            if (loans.length === 0) return alert('Não há dados para exportar.');
+            const dataStr = JSON.stringify(loans);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Backup_BGEmprestimos_${getHojeISO()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            toggleModal('modalConfig');
+        }
+
+        function importarBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (Array.isArray(importedData)) {
+                        if (confirm('Atenção: A restauração substituirá os dados atuais. Deseja continuar?')) {
+                            loans = importedData;
+                            localStorage.setItem('banco_gomes_dados', JSON.stringify(loans));
+                            renderLoans();
+                            alert('Dados restaurados com sucesso!');
+                            toggleModal('modalConfig');
+                        }
+                    }
+                } catch (error) { alert('Ficheiro de backup inválido.'); }
+                event.target.value = ''; 
+            };
+            reader.readAsText(file);
+        }
+
+        // UI ACTIONS
+        function toggleModal(id) { 
+            const m = document.getElementById(id);
+            m.classList.toggle('active'); 
+            
+            if(id === 'modalConfig' && m.classList.contains('active')) {
+                document.getElementById('configValorMinimo').value = configValorMinimoGlobal.toFixed(2);
+            }
+
+            if(id === 'modalOrcamento' && !m.classList.contains('active')) {
+                document.getElementById('orcNome').value = '';
+                document.getElementById('orcValor').value = '';
+                document.getElementById('orcTaxa').value = '';
+                document.getElementById('orcParcelas').value = '';
+                document.getElementById('orcResult').classList.add('hidden');
+                orcamentoAtual = null;
+            }
+        }
+        
+        function setTab(tab) {
+            tabAtual = tab;
+            ['todos', 'em_dia', 'em_atraso'].forEach(t => {
+                let el = document.getElementById('tab-'+t);
+                if(t === tab) el.className = "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap bg-blue-600 text-white shadow-sm transition-colors";
+                else el.className = "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap bg-white text-gray-500 border border-gray-200 transition-colors hover:bg-gray-50";
+            });
+            renderLoans();
+        }
+
+        function toggleForm() {
+            const m = document.getElementById('formModal');
+            m.classList.toggle('active');
+            if (!m.classList.contains('active')) {
+                document.getElementById('editIndex').value = '-1';
+                document.getElementById('formTitle').innerHTML = '<i class="ph ph-plus-circle text-blue-600"></i> Novo Empréstimo';
+                document.getElementById('nome').value = '';
+                document.getElementById('telefone').value = '';
+                document.getElementById('endereco').value = '';
+                document.getElementById('valor').value = '';
+                document.getElementById('taxa').value = '';
+                document.getElementById('dataEmprestimo').value = getHojeISO();
+                document.getElementById('tipoPagamento').value = 'juros';
+                document.getElementById('parcelas').value = '1';
+                document.getElementById('grupoParcelas').style.display = 'none';
+                
+                isValorMinimoAtivo = false;
+                valorMinimoTemporario = 0;
+                document.getElementById('btnMinimoJuros').style.display = 'block';
+                atualizarUIValorMinimo();
+            }
+        }
+
+        function mudarTipoPagamento() {
+            const tipo = document.getElementById('tipoPagamento').value;
+            document.getElementById('grupoParcelas').style.display = (tipo === 'price') ? 'block' : 'none';
+            document.getElementById('btnMinimoJuros').style.display = (tipo === 'juros') ? 'block' : 'none';
+            if (tipo === 'price' && isValorMinimoAtivo) {
+                isValorMinimoAtivo = false;
+                atualizarUIValorMinimo();
+            }
+        }
+
+        // CRUD
+        function salvarEmprestimo() {
+            const editIndex = parseInt(document.getElementById('editIndex').value);
+            const nome = document.getElementById('nome').value.trim();
+            const telefone = document.getElementById('telefone').value.trim();
+            const endereco = document.getElementById('endereco').value.trim();
+            const valor = parseFloat(document.getElementById('valor').value);
+            let taxa = parseFloat(document.getElementById('taxa').value);
+            if (isValorMinimoAtivo) taxa = 0;
+            const dataEmprestimo = document.getElementById('dataEmprestimo').value || getHojeISO();
+            const tipoPagamento = document.getElementById('tipoPagamento').value;
+            const parcelasTotais = parseInt(document.getElementById('parcelas').value) || 1;
+
+            if (!nome || isNaN(valor) || (!isValorMinimoAtivo && isNaN(taxa))) { alert('Preencha Nome, Capital e Taxa.'); return; }
+
+            const loanData = {
+                nome, telefone, endereco, valor, taxa, dataEmprestimo,
+                dataVencimento: (editIndex >= 0 && loans[editIndex].dataVencimento) ? loans[editIndex].dataVencimento : adicionarMesesISO(dataEmprestimo, 1),
+                tipoPagamento, parcelasTotais: tipoPagamento === 'price' ? parcelasTotais : 1,
+                parcelaAtual: editIndex >= 0 ? loans[editIndex].parcelaAtual : 1,
+                quitado: editIndex >= 0 ? loans[editIndex].quitado : false,
+                pagamentos: editIndex >= 0 ? (loans[editIndex].pagamentos || []) : [],
+                usaValorMinimo: isValorMinimoAtivo,
+                valorMinimoAplicado: isValorMinimoAtivo ? (valorMinimoTemporario > 0 ? valorMinimoTemporario : configValorMinimoGlobal) : 0
+            };
+
+            if (editIndex >= 0) loans[editIndex] = loanData;
+            else loans.push(loanData);
+
+            localStorage.setItem('banco_gomes_dados', JSON.stringify(loans));
+            toggleForm(); renderLoans();
+        }
+
+        function editarEmprestimo(index) {
+            const l = loans[index];
+            document.getElementById('editIndex').value = index;
+            document.getElementById('formTitle').innerHTML = '<i class="ph ph-pencil-simple text-blue-600"></i> Editar Empréstimo';
+            document.getElementById('nome').value = l.nome;
+            document.getElementById('telefone').value = l.telefone || '';
+            document.getElementById('endereco').value = l.endereco || '';
+            document.getElementById('valor').value = l.valor;
+            document.getElementById('taxa').value = l.taxa || '';
+            document.getElementById('dataEmprestimo').value = l.dataEmprestimo || getHojeISO();
+            
+            isValorMinimoAtivo = l.usaValorMinimo || false;
+            valorMinimoTemporario = l.valorMinimoAplicado || 0;
+            atualizarUIValorMinimo();
+            document.getElementById('tipoPagamento').value = l.tipoPagamento || 'juros';
+            document.getElementById('parcelas').value = l.parcelasTotais || 1;
+            mudarTipoPagamento();
+            document.getElementById('formModal').classList.add('active');
+        }
+
+        function novoEmprestimoCliente(index) {
+            const l = loans[index];
+            toggleForm();
+            document.getElementById('nome').value = l.nome;
+            document.getElementById('telefone').value = l.telefone || '';
+            document.getElementById('endereco').value = l.endereco || '';
+            document.getElementById('formTitle').innerHTML = '<i class="ph ph-user-plus text-blue-600"></i> Novo para ' + l.nome.split(' ')[0];
+        }
+
+        function deletarEmprestimo(index) {
+            if (confirm('Atenção: Excluir este registo do sistema?')) {
+                loans.splice(index, 1);
+                localStorage.setItem('banco_gomes_dados', JSON.stringify(loans));
+                renderLoans();
+            }
+        }
+
+        // PAGAMENTO E PDF COMPROVANTE
+        async function acaoReceber(index, tipoAcao) {
+            let loan = loans[index];
+            if (loan.quitado) return;
+            
+            let fin = getLoanFin(loan);
+            let valorPago = 0;
+            let hojeStrLocal = getHojeISO();
+            let jurosRecebido = fin.jurosMes;
+            
+            if (tipoAcao === 'juros') {
+                valorPago = fin.jurosMes;
+            } else if (tipoAcao === 'parcela') {
+                valorPago = fin.parcelaValor;
+            } else if (tipoAcao === 'quitacao') {
+                jurosRecebido = (hojeStrLocal > loan.dataVencimento ? fin.jurosMes : 0);
+                valorPago = fin.saldoDevedor + jurosRecebido; 
+            }
+
+            if (!confirm(`Confirmar recebimento de ${formatarDinheiro(valorPago)} e gerar recibo PDF?`)) return;
+
+            await gerarComprovantePDF(loan, valorPago, tipoAcao);
+
+            if (!loan.pagamentos) loan.pagamentos = [];
+            loan.pagamentos.push({
+                data: hojeStrLocal,
+                valorJuros: jurosRecebido,
+                valorTotal: valorPago,
+                tipo: tipoAcao
+            });
+
+            if (tipoAcao === 'juros') {
+                loan.dataVencimento = adicionarMesesISO(loan.dataVencimento, 1);
+            } else if (tipoAcao === 'parcela') {
+                loan.parcelaAtual++;
+                if (loan.parcelaAtual > loan.parcelasTotais) loan.quitado = true;
+                loan.dataVencimento = adicionarMesesISO(loan.dataVencimento, 1);
+            } else if (tipoAcao === 'quitacao') {
+                loan.quitado = true;
+            }
+
+            localStorage.setItem('banco_gomes_dados', JSON.stringify(loans));
+            renderLoans();
+        }
+
+        async function gerarComprovantePDF(loan, valor, tipo) {
+            if (!window.jspdf) return alert("Erro no gerador de PDF.");
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ format: 'a5' }); 
+            
+            // Header e Logo
+            desenharLogoPDF(doc, 15, 12);
+            doc.setFontSize(18);
+            doc.setFont("helvetica", "bold");
+            doc.text("BG Empréstimos", 33, 20);
+            
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "normal");
+            doc.text("Recibo de Pagamento", 15, 32);
+            doc.setDrawColor(200, 200, 200);
+            doc.line(15, 36, 133, 36);
+            
+            doc.setFontSize(10);
+            doc.text(`Cliente:`, 15, 46);
+            doc.setFont("helvetica", "bold");
+            doc.text(loan.nome, 30, 46);
+            
+            doc.setFont("helvetica", "normal");
+            doc.text(`Data:`, 15, 54);
+            doc.setFont("helvetica", "bold");
+            doc.text(formatarDataBR(getHojeISO()), 26, 54);
+            
+            doc.setFont("helvetica", "normal");
+            doc.text(`Valor Pago:`, 15, 62);
+            doc.setFont("helvetica", "bold");
+            doc.text(`R$ ${valor.toFixed(2)}`, 36, 62);
+            
+            doc.setFont("helvetica", "normal");
+            let ref = "Referente a: ";
+            if(tipo === 'juros') ref += loan.usaValorMinimo ? "Mensalidade (Valor Mínimo Juros)" : "Mensalidade (Juros)";
+            else if(tipo === 'parcela') ref += `Parcela ${loan.parcelaAtual} de ${loan.parcelasTotais} (Tabela Price)`;
+            else if(tipo === 'quitacao') ref += "Quitação Total do Contrato";
+            
+            let splitRef = doc.splitTextToSize(ref, 118);
+            doc.text(splitRef, 15, 70);
+            
+            doc.line(15, 85, 133, 85);
+            doc.setFontSize(9);
+            doc.setTextColor(100, 100, 100);
+            doc.text("BG Empréstimos agradece a sua preferência.", 15, 93);
+
+            const pdfBlob = doc.output('blob');
+            const file = new File([pdfBlob], `Recibo_BG_${loan.nome.replace(/\s+/g, '_')}.pdf`, { type: 'application/pdf' });
+            
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try { await navigator.share({ files: [file], title: 'Recibo BG Empréstimos', text: 'Segue o seu recibo.' }); } 
+                catch (e) { doc.save(file.name); }
+            } else { doc.save(file.name); }
+        }
+
+        // RELATÓRIOS PDF
+        function gerarRelatorioCompleto() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            desenharLogoPDF(doc, 14, 12);
+            doc.setFontSize(18);
+            doc.setFont("helvetica", "bold");
+            doc.text("BG Empréstimos", 32, 20);
+            
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(100, 100, 100);
+            doc.text("Relatório Geral de Carteira", 14, 30);
+            
+            doc.setTextColor(0, 0, 0);
+            let y = 40;
+            if(loans.length === 0) { 
+                doc.setFontSize(10);
+                doc.text("Nenhum registo encontrado.", 14, y); 
+            }
+            
+            loans.forEach((l, i) => {
+                if (y > 270) { doc.addPage(); y = 20; }
+                let stat = l.quitado ? 'Quitado' : (getHojeISO() > l.dataVencimento ? 'Em Atraso' : 'Em Dia');
+                let tipoStr = l.tipoPagamento === 'price' ? `Price (${l.parcelaAtual}/${l.parcelasTotais})` : 'Juros';
+                let fin = getLoanFin(l);
+                
+                let taxaStr = (l.tipoPagamento === 'juros' && l.usaValorMinimo) ? 'Mín. Juros' : `${l.taxa}%`;
+
+                doc.setFontSize(11);
+                doc.setFont("helvetica", "bold");
+                doc.text(`${i+1}. ${l.nome} [${stat}]`, 14, y);
+                y += 5;
+                doc.setFontSize(9);
+                doc.setFont("helvetica", "normal");
+                doc.text(`Tel: ${l.telefone || '-'} | Cap: R$ ${l.valor.toFixed(2)} | Tx: ${taxaStr} | Mod: ${tipoStr}`, 14, y);
+                y += 5;
+                doc.text(`Mensalidade: R$ ${fin.parcelaValor.toFixed(2)} | Próx. Venc: ${formatarDataBR(l.dataVencimento)}`, 14, y);
+                y += 8;
+                doc.setDrawColor(220, 220, 220);
+                doc.line(14, y-4, 196, y-4);
+            });
+            doc.save("Relatorio_Carteira_BG.pdf");
+            toggleModal('modalRelatorios');
+        }
+
+        function gerarRelatorioMes() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            let mesAtualStr = getHojeISO().substring(0, 7);
+            let partesMes = mesAtualStr.split('-');
+            let mesFormatado = partesMes[1] + '/' + partesMes[0];
+
+            desenharLogoPDF(doc, 14, 12);
+            doc.setFontSize(18);
+            doc.setFont("helvetica", "bold");
+            doc.text("BG Empréstimos", 32, 20);
+            
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Fecho de Mês - Referência: ${mesFormatado}`, 14, 30);
+            
+            doc.setTextColor(0, 0, 0);
+            let y = 45;
+            let somaJuros = 0;
+            let recebimentos = [];
+
+            loans.forEach((l) => {
+                let pagamentosMes = (l.pagamentos || []).filter(p => p.data.startsWith(mesAtualStr));
+                let jurosClienteMes = pagamentosMes.reduce((acc, curr) => acc + curr.valorJuros, 0);
+
+                if (jurosClienteMes > 0) {
+                    recebimentos.push({ nome: l.nome, juros: jurosClienteMes });
+                    somaJuros += jurosClienteMes;
+                }
+            });
+
+            if (recebimentos.length === 0) {
+                doc.setFontSize(10);
+                doc.text("Sem recebimentos registados neste mês.", 14, y);
+            } else {
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "bold");
+                doc.text("Cliente", 14, y);
+                doc.text("Juros Recebidos", 150, y);
+                y += 5;
+                doc.line(14, y, 190, y);
+                y += 7;
+
+                recebimentos.forEach(r => {
+                    if (y > 260) { doc.addPage(); y = 20; }
+                    doc.setFont("helvetica", "normal");
+                    doc.text(r.nome, 14, y);
+                    doc.text(`R$ ${r.juros.toFixed(2)}`, 150, y);
+                    y += 7;
+                });
+                
+                doc.line(14, y, 190, y);
+                y += 10;
+                doc.setFontSize(14);
+                doc.setFont("helvetica", "bold");
+                doc.text("TOTAL DE LUCRO (JUROS):", 14, y);
+                doc.text(`R$ ${somaJuros.toFixed(2)}`, 140, y);
+            }
+            
+            doc.save(`Fecho_Mes_BG_${mesFormatado.replace('/','_')}.pdf`);
+            toggleModal('modalRelatorios');
+        }
+
+        function cobrarWhatsapp(index) {
+            const loan = loans[index];
+            if (!loan.telefone) return alert('Cliente sem número registado.');
+            let num = '55' + loan.telefone.replace(/\D/g, '');
+            let fin = getLoanFin(loan);
+            let msg = `Olá, ${loan.nome.split(' ')[0]}! Tudo bem?
+
+Lembrando que a sua parcela da *BG Empréstimos* (R$ ${fin.parcelaValor.toFixed(2)}) tem vencimento para o dia *${formatarDataBR(loan.dataVencimento)}*.
+
+Qualquer dúvida, estou à disposição!`;
+            window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
+        }
+
+        function renderLoans() {
+            const listEl = document.getElementById('loanList');
+            const search = document.getElementById('searchBox').value.toLowerCase();
+            listEl.innerHTML = '';
+
+            let totalEmp = 0, totalRec = 0, totalJur = 0;
+            let hojeStrRender = getHojeISO();
+
+            loans.forEach((loan, index) => {
+                if (!loan.dataVencimento) loan.dataVencimento = adicionarMesesISO(loan.dataEmprestimo || hojeStrRender, 1);
+                const emAtraso = hojeStrRender > loan.dataVencimento && !loan.quitado;
+                const emDia = !emAtraso && !loan.quitado;
+
+                if (search && !loan.nome.toLowerCase().includes(search)) return;
+                if (tabAtual === 'em_atraso' && !emAtraso) return;
+                if (tabAtual === 'em_dia' && !emDia) return;
+                if (tabAtual !== 'todos' && loan.quitado) return;
+
+                let fin = getLoanFin(loan);
+                if (!loan.quitado) {
+                    totalEmp += fin.saldoDevedor; 
+                    totalRec += fin.parcelaValor;
+                    totalJur += fin.jurosMes;
+                }
+
+                let tipoTexto = loan.tipoPagamento === 'price' ? `Tabela Price (${loan.parcelaAtual || 1}/${loan.parcelasTotais || 1})` : (loan.usaValorMinimo ? 'Mínimo Juros' : 'Juros Mensais');
+                let htmlBarra = '';
+
+                if (loan.tipoPagamento === 'price') {
+                    let percJuros = (fin.parcelaValor > 0) ? (fin.jurosMes / fin.parcelaValor) * 100 : 0;
+                    htmlBarra = `
+                        <div class="mb-4 border-b border-gray-100 pb-3">
+                            <div class="flex justify-between text-[10px] mb-1.5 font-bold tracking-wide uppercase">
+                                <span class="text-blue-500">Juros: ${formatarDinheiro(fin.jurosMes)}</span>
+                                <span class="text-emerald-500">Amortiza: ${formatarDinheiro(fin.amortizacaoMes)}</span>
+                            </div>
+                            <div class="w-full bg-gray-100 rounded-full h-1.5 flex overflow-hidden">
+                                <div class="bg-blue-500 h-1.5" style="width: ${percJuros}%"></div>
+                                <div class="bg-emerald-400 h-1.5" style="width: ${100 - percJuros}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                const statusClass = loan.quitado ? 'bg-gray-100 text-gray-500 border border-gray-200' : (emAtraso ? 'bg-red-50 text-red-600 border border-red-200 shadow-sm' : 'bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-sm');
+                const statusText = loan.quitado ? 'QUITADO' : (emAtraso ? 'EM ATRASO' : 'EM DIA');
+                
+                let btnPagamentos = '';
+                if (!loan.quitado) {
+                    if (loan.tipoPagamento === 'juros') {
+                        btnPagamentos = `
+                            <div class="flex gap-2 w-full mt-4">
+                                <button onclick="acaoReceber(${index}, 'juros')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl flex justify-center items-center gap-1.5 transition-colors text-[11px] uppercase tracking-wider shadow-sm"><i class="ph ph-hand-coins text-lg"></i> Rec. Juros</button>
+                                <button onclick="acaoReceber(${index}, 'quitacao')" class="flex-1 bg-gray-800 hover:bg-black text-white font-bold py-3 rounded-xl flex justify-center items-center gap-1.5 transition-colors text-[11px] uppercase tracking-wider shadow-sm"><i class="ph ph-flag-checkered text-lg"></i> Quitação</button>
+                            </div>
+                        `;
+                    } else {
+                        btnPagamentos = `
+                            <div class="flex gap-2 w-full mt-4">
+                                <button onclick="acaoReceber(${index}, 'juros')" class="flex-1 bg-blue-400 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl flex flex-col justify-center items-center gap-1 transition-colors text-[9px] uppercase tracking-wider shadow-sm"><i class="ph ph-coins text-lg"></i> Só Juros</button>
+                                <button onclick="acaoReceber(${index}, 'parcela')" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-xl flex flex-col justify-center items-center gap-1 transition-colors text-[9px] uppercase tracking-wider shadow-sm"><i class="ph ph-check-circle text-lg"></i> Parcela</button>
+                                <button onclick="acaoReceber(${index}, 'quitacao')" class="flex-1 bg-gray-800 hover:bg-black text-white font-bold py-2.5 rounded-xl flex flex-col justify-center items-center gap-1 transition-colors text-[9px] uppercase tracking-wider shadow-sm"><i class="ph ph-flag-checkered text-lg"></i> Quitar</button>
+                            </div>
+                        `;
+                    }
+                }
+
+                const cardHtml = `
+                    <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-200 relative ${loan.quitado ? 'opacity-75 grayscale-[20%]' : ''} hover:shadow-md transition-shadow">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="pr-2">
+                                <h2 class="text-lg font-black text-gray-800 tracking-tight leading-tight">${loan.nome}</h2>
+                                <p class="text-xs text-gray-400 mt-1 flex items-center gap-1 font-medium"><i class="ph ph-phone"></i> ${loan.telefone || 'S/ Telefone'}</p>
+                            </div>
+                            <span class="text-[9px] font-black px-2.5 py-1.5 rounded-lg uppercase tracking-wider ${statusClass} flex-shrink-0">${statusText}</span>
+                        </div>
+                        
+                        <div class="bg-gray-50/80 p-4 rounded-2xl border border-gray-100">
+                            <div class="flex justify-between border-b border-gray-200/60 pb-3 mb-3">
+                                <p class="text-[10px] font-bold text-gray-400 tracking-wider uppercase">Plano Base</p>
+                                <p class="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">${tipoTexto}</p>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4 ${loan.tipoPagamento === 'price' ? 'mb-4' : 'border-b border-gray-200/60 pb-3 mb-3'}">
+                                <div>
+                                    <p class="text-[9px] font-bold text-gray-400 tracking-wider uppercase">Capital Emprestado</p>
+                                    <p class="text-sm font-bold text-gray-800 mt-0.5">${formatarDinheiro(loan.valor)}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[9px] font-bold text-gray-400 tracking-wider uppercase">Mensalidade (Fixa)</p>
+                                    <p class="text-sm font-black text-blue-600 mt-0.5">${formatarDinheiro(fin.parcelaValor)}</p>
+                                </div>
+                            </div>
+                            
+                            ${htmlBarra}
+                            
+                            <div class="grid grid-cols-2 gap-4 bg-white p-3 rounded-xl border border-gray-100">
+                                <div>
+                                    <p class="text-[9px] font-bold text-gray-400 tracking-wider uppercase flex items-center gap-1"><i class="ph ph-calendar-blank"></i> Início</p>
+                                    <p class="text-xs font-bold text-gray-700 mt-1">${formatarDataBR(loan.dataEmprestimo)}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[9px] font-bold text-gray-400 tracking-wider uppercase flex items-center gap-1"><i class="ph ph-warning-circle ${emAtraso ? 'text-red-500' : ''}"></i> Próx. Venc.</p>
+                                    <p class="text-xs font-bold ${emAtraso ? 'text-red-600' : 'text-gray-700'} mt-1">${formatarDataBR(loan.dataVencimento)}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        ${btnPagamentos}
+                        
+                        <div class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+                            ${!loan.quitado ? `<button onclick="cobrarWhatsapp(${index})" class="flex-1 h-10 bg-[#25D366]/10 text-[#075E54] hover:bg-[#25D366]/20 rounded-xl flex justify-center items-center transition-colors shadow-sm gap-2 text-[10px] uppercase tracking-wider font-bold"><i class="ph ph-whatsapp-logo text-lg"></i> Cobrar</button>` : ''}
+                            
+                            <button onclick="novoEmprestimoCliente(${index})" class="w-10 h-10 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl flex justify-center items-center transition-colors shadow-sm"><i class="ph ph-user-plus text-lg"></i></button>
+                            <button onclick="editarEmprestimo(${index})" class="w-10 h-10 bg-gray-50 text-gray-600 hover:bg-gray-200 rounded-xl flex justify-center items-center transition-colors shadow-sm"><i class="ph ph-pencil-simple text-lg"></i></button>
+                            <button onclick="deletarEmprestimo(${index})" class="w-10 h-10 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl flex justify-center items-center transition-colors shadow-sm"><i class="ph ph-trash text-lg"></i></button>
+                        </div>
+                    </div>
+                `;
+                listEl.insertAdjacentHTML('beforeend', cardHtml);
+            });
+
+            document.getElementById('totalEmprestado').innerText = formatarDinheiro(totalEmp);
+            document.getElementById('totalRecebimento').innerText = formatarDinheiro(totalRec);
+            document.getElementById('totalJurosMensal').innerText = formatarDinheiro(totalJur);
+        }
+
+        inicializarSeguranca();
+    </script>
+</body>
+</html>
