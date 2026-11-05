@@ -205,11 +205,8 @@
             <!-- Segurança -->
             <div class="mb-6 bg-gray-50 p-4 rounded-2xl border border-gray-100">
                 <p class="text-xs text-gray-600 font-bold uppercase tracking-wide mb-3 flex items-center gap-1.5"><i class="ph ph-lock-key text-gray-400"></i> Segurança de Acesso</p>
-                <div class="flex gap-2">
-                    <input type="password" id="novaSenhaInput" placeholder="Definir Nova Senha" class="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-500">
-                    <button onclick="definirSenha()" class="bg-gray-800 text-white font-bold rounded-xl px-5 py-2.5 text-sm shadow-sm active:scale-95 transition-transform hover:bg-black">Salvar</button>
-                </div>
-                <button onclick="removerSenha()" class="w-full text-red-500 text-xs font-bold mt-3 py-2.5 bg-red-50 hover:bg-red-100 rounded-xl transition-colors border border-red-100">Remover Senha Atual</button>
+                <p class="text-[10px] text-gray-500 leading-tight">O sistema agora utiliza autenticação universal com criptografia nativa no código (SHA-256). A senha é exigida em qualquer dispositivo que acesse o painel e não pode ser lida a partir do código fonte do GitHub.</p>
+                <button onclick="sessionStorage.removeItem('acesso_liberado'); location.reload();" class="w-full text-gray-700 text-xs font-bold mt-3 py-2.5 bg-white shadow-sm rounded-xl transition-colors border border-gray-200 flex justify-center items-center gap-1.5 hover:bg-gray-100"><i class="ph ph-sign-out"></i> Bloquear Sistema Agora</button>
             </div>
 
             <!-- Parâmetros -->
@@ -351,15 +348,17 @@
         let isValorMinimoAtivo = false;
         let valorMinimoTemporario = 0;
 
-        // SEGURANÇA
+        // SEGURANÇA COM HASH (Criptografia)
+        const SENHA_HASH = "578ad5d9c4cf4d69191b3ec5d47390a00f0e2241029f26301080d42462cbc190"; // Hash SHA-256 da senha
+
         function inicializarSeguranca() {
-            const senhaSalva = localStorage.getItem('banco_gomes_senha');
-            if (senhaSalva && senhaSalva !== '') {
+            // Verifica se a sessão já está autorizada nesta aba
+            if (sessionStorage.getItem('acesso_liberado') === 'true') {
+                liberarAcesso();
+            } else {
                 document.getElementById('loginScreen').classList.remove('hidden');
                 document.getElementById('appContent').classList.remove('visible');
                 setTimeout(() => document.getElementById('senhaInput').focus(), 100);
-            } else {
-                liberarAcesso();
             }
         }
 
@@ -367,11 +366,19 @@
             if (event.key === 'Enter') verificarSenha();
         }
 
-        function verificarSenha() {
+        async function verificarSenha() {
             const senhaDigitada = document.getElementById('senhaInput').value;
-            const senhaSalva = localStorage.getItem('banco_gomes_senha');
             
-            if (senhaDigitada === senhaSalva) {
+            // Converte a senha digitada em Hash SHA-256 para comparar
+            const encoder = new TextEncoder();
+            const data = encoder.encode(senhaDigitada);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            
+            if (hashHex === SENHA_HASH) {
+                // Salva a permissão temporária na sessão (para não pedir senha se atualizar a página)
+                sessionStorage.setItem('acesso_liberado', 'true');
                 liberarAcesso();
             } else {
                 document.getElementById('erroSenha').classList.remove('hidden');
@@ -448,25 +455,9 @@
             }
         }
 
-        function definirSenha() {
-            const novaSenha = document.getElementById('novaSenhaInput').value;
-            if (novaSenha.trim() === '') {
-                alert('Por favor, digite uma senha válida.');
-                return;
-            }
-            localStorage.setItem('banco_gomes_senha', novaSenha);
-            alert('Senha salva! Será exigida na próxima vez que abrir o aplicativo.');
-            document.getElementById('novaSenhaInput').value = '';
-            toggleModal('modalConfig');
-        }
+        
 
-        function removerSenha() {
-            if (confirm('Tem certeza que deseja remover a senha de acesso?')) {
-                localStorage.removeItem('banco_gomes_senha');
-                alert('Senha removida. Acesso livre.');
-                toggleModal('modalConfig');
-            }
-        }
+        
 
         function salvarConfigMinimo() {
             const val = parseFloat(document.getElementById('configValorMinimo').value);
