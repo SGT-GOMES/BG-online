@@ -352,6 +352,13 @@
     <script>
         // CONFIGURAÇÃO DO FIREBASE (Nuvem)
         const FIREBASE_URL = "https://bg-emprestimos-default-rtdb.firebaseio.com/banco_gomes_dados.json";
+        const FIREBASE_API_KEY = "AIzaSyB35BHD3C33ZJILnr2Pp4ajGpEP-QdoLhY";
+        
+        // ⚠️ ATENÇÃO: SUBSTITUA ABAIXO PELO E-MAIL E SENHA QUE VOCÊ CRIOU NO FIREBASE
+        const FIREBASE_AUTH_EMAIL = "fabriciocbmto@hotmail.com"; 
+        const FIREBASE_AUTH_SENHA = "116476";
+        
+        let firebaseIdToken = null;
         
         let loans = []; 
         let carregandoNuvem = true;
@@ -402,6 +409,34 @@
             }
         }
 
+        
+        async function autenticarFirebase() {
+            if (firebaseIdToken) return true; // Já está autenticado
+            
+            try {
+                const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: FIREBASE_AUTH_EMAIL,
+                        password: FIREBASE_AUTH_SENHA,
+                        returnSecureToken: true
+                    })
+                });
+                const data = await res.json();
+                if (data.idToken) {
+                    firebaseIdToken = data.idToken;
+                    return true;
+                } else {
+                    console.error("Erro na autenticação do Firebase:", data.error);
+                    return false;
+                }
+            } catch (e) {
+                console.error("Sem internet para autenticar no Firebase:", e);
+                return false;
+            }
+        }
+
         function liberarAcesso() {
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('appContent').classList.add('visible');
@@ -416,8 +451,17 @@
             const titulo = document.getElementById('totalEmprestado');
             if(titulo) titulo.innerText = "Sincronizando...";
             
+            // 1. Tenta autenticar no Firebase com o login de fundo
+            await autenticarFirebase();
+            
+            // 2. Monta a URL com a chave de segurança (auth) se estiver autenticado
+            let urlFetch = FIREBASE_URL + "?t=" + new Date().getTime();
+            if (firebaseIdToken) {
+                urlFetch += "&auth=" + firebaseIdToken;
+            }
+            
             try {
-                const response = await fetch(FIREBASE_URL + "?t=" + new Date().getTime());
+                const response = await fetch(urlFetch);
                 if (response.ok) {
                     const data = await response.json();
                     
@@ -457,9 +501,17 @@
             // Salva backup local imediatamente
             localStorage.setItem('banco_gomes_dados_backup', JSON.stringify(loans));
             
+            // Garante que está autenticado
+            await autenticarFirebase();
+            
+            let urlFetch = FIREBASE_URL;
+            if (firebaseIdToken) {
+                urlFetch += "?auth=" + firebaseIdToken;
+            }
+            
             try {
                 // PUT substitui completamente o nó
-                const response = await fetch(FIREBASE_URL, {
+                const response = await fetch(urlFetch, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(loans)
